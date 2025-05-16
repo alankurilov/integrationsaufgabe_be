@@ -33,6 +33,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.post("/login")
+def log_in(person: Person, db: Session = Depends(get_db)): 
+    person_check = db.query(models.Person).filter(models.Person.email == person.email).first()
+    if(person_check.password == person.password):
+        return person.email
+ 
+    raise HTTPException(
+        status_code = 404,
+        detail=f"password is wrong"
+    )
+
 
 @app.get("/")
 def read_api(db: Session = Depends(get_db)):
