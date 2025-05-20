@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 from uuid import UUID
@@ -25,6 +24,11 @@ class Person(BaseModel):
     email: str = Field(min_length = 1, max_length = 99)
     password: str = Field(min_length = 1, max_length = 99)
 
+class Candidate(BaseModel):
+    firstName: str = Field(min_length = 1)
+    lastName: str = Field(min_length = 1, max_length = 99)
+
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,6 +47,28 @@ def log_in(person: Person, db: Session = Depends(get_db)):
     raise HTTPException(
         status_code = 404,
         detail=f"password is wrong"
+    )
+
+
+@app.get("/candidates")
+def read_api_candidates(db: Session = Depends(get_db)):
+    return db.query(models.Candidate).all()
+
+@app.post("/candidates")
+def create_candidate(candidate: Candidate, db: Session = Depends(get_db)):
+    candidate_check = db.query(models.Candidate).filter(models.Candidate.firstName == candidate.firstName).first()
+    if candidate_check is None:        
+        candidate_model = models.Candidate()
+        candidate_model.firstName = candidate.firstName
+        candidate_model.lastName = candidate.lastName
+
+        db.add(candidate_model)
+        db.commit()
+    
+        return candidate 
+    raise HTTPException(
+        status_code = 400,
+        detail=f"user {candidate.firstName} already exists"
     )
 
 
