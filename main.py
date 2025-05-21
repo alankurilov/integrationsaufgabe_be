@@ -71,7 +71,6 @@ def create_candidate(candidate: Candidate, db: Session = Depends(get_db)):
         detail=f"user {candidate.firstName} already exists"
     )
 
-
 @app.get("/")
 def read_api(db: Session = Depends(get_db)):
     return db.query(models.Person).all()
