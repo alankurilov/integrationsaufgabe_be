@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
 from pydantic import BaseModel, Field
 from uuid import UUID
 import models
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -24,10 +25,9 @@ class Person(BaseModel):
     email: str = Field(min_length = 1, max_length = 99)
     password: str = Field(min_length = 1, max_length = 99)
 
-class Candidate(BaseModel):
-    firstName: str = Field(min_length = 1)
-    lastName: str = Field(min_length = 1, max_length = 99)
-
+class Vote(BaseModel):
+    voterID: int = Field(gt = 0) 
+    choiceID: int = Field(gt = 0)
 
 
 app.add_middleware(
@@ -47,28 +47,6 @@ def log_in(person: Person, db: Session = Depends(get_db)):
     raise HTTPException(
         status_code = 404,
         detail=f"password is wrong"
-    )
-
-
-@app.get("/candidates")
-def read_api_candidates(db: Session = Depends(get_db)):
-    return db.query(models.Candidate).all()
-
-@app.post("/candidates")
-def create_candidate(candidate: Candidate, db: Session = Depends(get_db)):
-    candidate_check = db.query(models.Candidate).filter(models.Candidate.firstName == candidate.firstName).first()
-    if candidate_check is None:        
-        candidate_model = models.Candidate()
-        candidate_model.firstName = candidate.firstName
-        candidate_model.lastName = candidate.lastName
-
-        db.add(candidate_model)
-        db.commit()
-    
-        return candidate 
-    raise HTTPException(
-        status_code = 400,
-        detail=f"user {candidate.firstName} already exists"
     )
 
 @app.get("/")
@@ -126,3 +104,33 @@ def delete_person(person_id: int, db: Session = Depends(get_db)):
     db.query(models.Person).filter(models.Person.id == person_id).delete()
 
     db.commit()
+
+@app.get("/votes")
+def read_api(db: Session = Depends(get_db)):
+    return db.query(models.Vote).all()
+
+
+@app.post("/vote")
+def create_vote(vote: Vote, db: Session = Depends(get_db)):
+    vote_check = db.query(models.Vote).filter(models.Vote.voterID == vote.voterID).first()
+    person = db.query(models.Person).filter(models.Person.id == vote.voterID).first()
+    if vote_check is None:
+        vote_model = models.Vote()
+        vote_model.voterID = vote.voterID
+        vote_model.choiceID = vote.choiceID
+
+        db.add(vote_model)
+        try:
+            db.commit()
+            return vote
+        except IntegrityError as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Foreign key violation: voter_id or candidate_id doesn't exist",
+            )
+
+    raise HTTPException(
+        status_code = 400,
+        detail=f"vote from: {person.firstName} {person.lastName}, email: {person.email} already exists"
+    )
