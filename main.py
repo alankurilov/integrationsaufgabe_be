@@ -110,7 +110,7 @@ def read_api(db: Session = Depends(get_db)):
     return db.query(models.Vote).all()
 
 
-@app.post("/vote")
+@app.post("/votes")
 def create_vote(vote: Vote, db: Session = Depends(get_db)):
     vote_check = db.query(models.Vote).filter(models.Vote.voterID == vote.voterID).first()
     person = db.query(models.Person).filter(models.Person.id == vote.voterID).first()
@@ -134,3 +134,39 @@ def create_vote(vote: Vote, db: Session = Depends(get_db)):
         status_code = 400,
         detail=f"vote from: {person.firstName} {person.lastName}, email: {person.email} already exists"
     )
+
+@app.delete("/votes/{voter_id}")
+def delete_vote(voter_id:int, db: Session = Depends(get_db)):
+    vote_check = db.query(models.Vote).filter(models.Vote.voterID == voter_id).first()
+    if vote_check is None:
+        raise HTTPException(
+            status_code = 404,
+            detail=f"ID {voter_id}: does not exist"
+        )
+    db.query(models.Vote).filter(models.Vote.voterID == voter_id).delete()
+
+    db.commit()
+
+@app.put("/votes/{voter_id}")
+def update_voter(voter_id: int, vote: Vote, db: Session = Depends(get_db)):
+    vote_check = db.query(models.Vote).filter(models.Vote.voterID == voter_id).first()
+
+    if vote_check is None:
+        raise HTTPException(
+            status_code= 404,
+            detail=f"ID {voter_id} does not exist"
+        )
+    vote_model = models.Vote()
+    vote_model.voterID = voter_id
+    vote_model.choiceID = vote.choiceID
+
+    db.add(vote_model)
+    try:
+        db.commit()
+        return vote
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Foreign key violation: voter_id or candidate_id doesn't exist",
+        )
