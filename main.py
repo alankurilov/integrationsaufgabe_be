@@ -6,9 +6,9 @@ from database import engine, SessionLocal
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi.middleware.cors import CORSMiddleware
-
+import auth
 app = FastAPI()
-
+app.include_router(auth.router)
 
 models.Base.metadata.create_all(bind=engine)
 
