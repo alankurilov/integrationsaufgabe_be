@@ -18,7 +18,7 @@ router = APIRouter(
 SECRET_KEY = '42acd4754321f76d9fd75df2016f883d'
 ALGORITHM = 'HS256'
 
-bcrypt_context = CryptContext(schemes=['argon2'], deprecated='auto') # Change to argon_context
+bcrypt_context = CryptContext(schemes=['argon2']) # Change to argon_context
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
 
 class CreateUserRequest(BaseModel):
@@ -72,14 +72,15 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
 
 def authenticate_user(username: str, password: str, db):
     user = db.query(Person).filter(Person.email == username).first()
+    print(user.password)
     if not user:
         return False
-    if not bcrypt_context.verify(password, user.hashed_password):
+    if not bcrypt_context.verify(password, user.password):
         return False
     return user
 
-def create_access_token(username: str, user_id: int, exxpires_delta: timedelta):
+def create_access_token(username: str, user_id: int, expires_delta: timedelta):
     encode = {'sub': username, 'id': user_id}
-    expires = datetime.utcnow() + exxpires_delta
+    expires = datetime.utcnow() + expires_delta
     encode.update({'exp': expires})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
